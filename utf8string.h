@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <stdlib.h>
+#include <stdio.h>
 
 typedef int8_t int8;
 typedef int16_t int16;
@@ -27,6 +28,11 @@ typedef enum
 	E_ENCODING_EUC,
 	E_ENCODING_UTF16,
 } E_ENCODING;
+
+const uint32_t E_CONVERT_HW_CAPITAL_ALPHABET = 1;
+const uint32_t E_CONVERT_HW_SMALL_ALPHABET = 2;
+const uint32_t E_CONVERT_HW_NUMBER = 4;
+const uint32_t E_CONVERT_HW_SYMBOL = 8;
 
 #ifdef _WIN32
 #pragma warning(disable:4996)
@@ -99,6 +105,105 @@ public:
 
         return true;
 	}
+
+    bool toHalfWidth(uint32_t options) {
+        char *tmp = NULL;
+        uint32_t code;
+        bool converted = false;
+
+        std::ios::fmtflags orgflags = std::cout.flags();
+        std::cout.setf(std::ios::hex, std::ios::basefield);
+        for (uinteger i = 0; i < charlist.size(); i++) {
+            tmp = charlist.at(i);
+
+            if (strlen(tmp) != 3) {
+                // supported letters are should be 3 bytes
+                continue;
+            }
+
+            code = (tmp[0] & 0xff) << 16 | (tmp[1] & 0xff) << 8 | (tmp[2] & 0xff);
+            if (options & E_CONVERT_HW_CAPITAL_ALPHABET) {
+                if ((0xefbca1 <= code) && (code <= 0xefbcba)) {
+                    tmp[0] = code - (0xefbc80 - 0x20);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+            }
+            if (options & E_CONVERT_HW_SMALL_ALPHABET) {
+                if ((0xefbd81 <= code) && (code <= 0xefbd9a)) {
+                    tmp[0] = code - (0xefbd81 - 0x61);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+            }
+            if (options & E_CONVERT_HW_NUMBER) {
+                if ((0xefbc90 <= code) && (code <= 0xefbc99)) {
+                    tmp[0] = code - (0xefbc80 - 0x20);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+            }
+            if (options & E_CONVERT_HW_SYMBOL) {
+                if (((0xefbc81 <= code) && (code <= 0xefbc8f)) ||
+                    ((0xefbc9a <= code) && (code <= 0xefbca0)) ||
+                    ((0xefbcbb <= code) && (code <= 0xefbcbf))) {
+                    tmp[0] = code - (0xefbc80 - 0x20);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+                else if (0xefbd80 == code) {
+                    tmp[0] = code - (0xefbd80 - 0x60);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+                else if ((0xefbd9b <= code) && (code <= 0xefbd9e)) {
+                    tmp[0] = code - (0xefbd9b - 0x7b);
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+                else if (0xe38080 == code) {
+                    tmp[0] = 0x20;
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+                else if (0xe3809c == code) {
+                    tmp[0] = 0x7e;
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+                else if (0xe383bc == code) {
+                    tmp[0] = 0x2d;
+                    tmp[1] = 0;
+                    tmp[2] = 0;
+                    converted = true;
+                    continue;
+                }
+            }
+        }
+
+        if (converted) {
+            rebuild();
+        }
+
+        std::cout.flags(orgflags);
+        return true;
+    }
 
 	bool contain(const utf8string &chars) const {
 		return this->find(chars) == -1 ? false : true;
@@ -186,5 +291,5 @@ private:
 
 private:
 	std::string utf8stringbuf;
-	std::vector<const char*> charlist;
+	std::vector<char*> charlist;
 };
